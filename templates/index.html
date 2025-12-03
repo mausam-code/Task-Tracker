@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Tracker</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height:100vh; padding:20px; }
+.container { max-width:900px; margin:0 auto; background:rgba(255,255,255,0.95); border-radius:15px; padding:30px; box-shadow:0 20px 40px rgba(0,0,0,0.1); backdrop-filter:blur(10px); }
+h1 { text-align:center; color:#333; margin-bottom:30px; font-size:2.5rem; background:linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.add-task-form { background:#f8f9fa; padding:25px; border-radius:12px; margin-bottom:30px; border:1px solid #e9ecef; }
+.form-group { margin-bottom:15px; }
+label { display:block; margin-bottom:5px; font-weight:600; color:#555; }
+input[type="text"], textarea { width:100%; padding:12px; border:2px solid #ddd; border-radius:8px; font-size:14px; transition:border-color 0.3s ease; }
+input[type="text"]:focus, textarea:focus { outline:none; border-color:#667eea; box-shadow:0 0 0 3px rgba(102,126,234,0.1); }
+textarea { resize:vertical; min-height:80px; }
+.btn { background: linear-gradient(45deg, #667eea, #764ba2); color:white; border:none; padding:12px 24px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; transition:transform 0.2s ease, box-shadow 0.2s ease; }
+.btn:hover { transform: translateY(-2px); box-shadow:0 5px 15px rgba(102,126,234,0.3); }
+.btn-sm { padding:8px 16px; font-size:12px; margin:2px; }
+.btn-danger { background: linear-gradient(45deg, #ff6b6b, #ee5a52); }
+.btn-success { background: linear-gradient(45deg, #51cf66, #40c057); }
+.btn-warning { background: linear-gradient(45deg, #ffd43b, #fab005); color:#333; }
+.task-list { display:grid; gap:20px; }
+.task-item { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.07); border-left:4px solid #667eea; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.task-item:hover { transform:translateY(-2px); box-shadow:0 8px 25px rgba(0,0,0,0.15); }
+.task-item.completed { border-left-color:#51cf66; opacity:0.8; }
+.task-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:15px; }
+.task-title { font-size:1.2rem; font-weight:600; color:#333; margin-bottom:5px; }
+.task-status { padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; text-transform:uppercase; }
+.task-status.pending { background:#fff3cd; color:#856404; }
+.task-status.completed { background:#d4edda; color:#155724; }
+.task-description { color:#666; margin-bottom:15px; line-height:1.5; }
+.task-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; font-size:14px; color:#777; }
+.timer-section { background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:15px; text-align:center; }
+.timer-display { font-size:2rem; font-weight:600; color:#333; margin-bottom:10px; font-family:'Courier New', monospace; }
+.timer-display.running { color:#51cf66; animation:pulse 2s infinite; }
+@keyframes pulse { 0% {opacity:1;} 50% {opacity:0.7;} 100% {opacity:1;} }
+.task-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.no-tasks { text-align:center; color:#666; font-style:italic; padding:40px; background:#f8f9fa; border-radius:12px; border:2px dashed #ddd; }
+@media(max-width:768px) { .container { padding:20px; margin:10px; } h1 { font-size:2rem; } .task-header { flex-direction:column; align-items:flex-start; } .task-actions { justify-content:center; } }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>📝 Task Tracker</h1>
+
+<div class="add-task-form">
+<form action="/add_task" method="post">
+<div class="form-group">
+<label for="title">Task Title *</label>
+<input type="text" id="title" name="title" required placeholder="Enter task title...">
+</div>
+<div class="form-group">
+<label for="description">Description</label>
+<textarea id="description" name="description" placeholder="Enter task description (optional)..."></textarea>
+</div>
+<button type="submit" class="btn">Add Task</button>
+</form>
+</div>
+
+<div class="task-list">
+{% if tasks %}
+{% for task in tasks %}
+<div class="task-item {{ task.status }}">
+    <div class="task-header">
+        <div>
+            <div class="task-title">{{ task.title }}</div>
+            <div class="task-status {{ task.status }}">{{ task.status }}</div>
+        </div>
+    </div>
+
+    {% if task.description %}
+    <div class="task-description">{{ task.description }}</div>
+    {% endif %}
+
+    <div class="task-meta">
+        <span>Created: {{ task.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+    </div>
+
+    <div class="timer-section">
+        <div class="timer-display" id="timer-{{ task.id }}">{{ task.format_time(task.time_spent) }}</div>
+        <div class="task-actions">
+            <button class="btn btn-sm btn-success" onclick="startTimer({{ task.id }})">▶️ Start</button>
+            <button class="btn btn-sm btn-warning" onclick="stopTimer({{ task.id }})">⏸️ Stop</button>
+            <button class="btn btn-sm btn-danger" onclick="resetTimer({{ task.id }})">🔄 Reset</button>
+        </div>
+    </div>
+
+    <div class="task-actions">
+        <a href="/toggle_status/{{ task.id }}" class="btn btn-sm">{% if task.status=='pending' %}✅ Mark Complete{% else %}🔄 Mark Pending{% endif %}</a>
+        <a href="/delete_task/{{ task.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this task?')">🗑️ Delete</a>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="no-tasks">
+<h3>No tasks yet!</h3>
+<p>Add your first task using the form above.</p>
+</div>
+{% endif %}
+</div>
+</div>
+
+<script>
+const timers = new Map();
+
+async function safeFetch(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return await response.json();
+}
+
+function startTimer(taskId) {
+    if (timers.has(taskId)) return; // Prevent duplicate intervals
+
+    safeFetch(`/start_timer/${taskId}`)
+        .then(data => {
+            if (data.status === 'started') {
+                const intervalId = setInterval(() => updateTimer(taskId), 1000);
+                timers.set(taskId, intervalId);
+                document.getElementById(`timer-${taskId}`).classList.add('running');
+            }
+        })
+        .catch(err => {
+            console.error('Start timer error:', err);
+            alert('Failed to start timer. Please refresh the page.');
+        });
+}
+
+function stopTimer(taskId) {
+    safeFetch(`/stop_timer/${taskId}`)
+        .then(data => {
+            if (data.status === 'stopped') {
+                if (timers.has(taskId)) {
+                    clearInterval(timers.get(taskId));
+                    timers.delete(taskId);
+                }
+                const el = document.getElementById(`timer-${taskId}`);
+                el.classList.remove('running');
+                updateTimer(taskId);
+            }
+        })
+        .catch(err => {
+            console.error('Stop timer error:', err);
+            alert('Failed to stop timer. Please refresh the page.');
+        });
+}
+
+function resetTimer(taskId) {
+    if (!confirm('Reset this timer? This cannot be undone.')) return;
+
+    safeFetch(`/reset_timer/${taskId}`)
+        .then(data => {
+            if (data.status === 'reset') {
+                if (timers.has(taskId)) {
+                    clearInterval(timers.get(taskId));
+                    timers.delete(taskId);
+                }
+                const el = document.getElementById(`timer-${taskId}`);
+                el.textContent = '00:00:00';
+                el.classList.remove('running');
+            }
+        })
+        .catch(err => {
+            console.error('Reset timer error:', err);
+            alert('Failed to reset timer. Please refresh the page.');
+        });
+}
+
+function updateTimer(taskId) {
+    safeFetch(`/get_task_time/${taskId}`)
+        .then(data => {
+            const el = document.getElementById(`timer-${taskId}`);
+            if (!el) return; // DOM element might be gone after delete
+
+            el.textContent = data.formatted_time || '00:00:00';
+
+            if (data.is_running) {
+                el.classList.add('running');
+                if (!timers.has(taskId)) {
+                    // Safety sync: restart interval if missing
+                    const intervalId = setInterval(() => updateTimer(taskId), 1000);
+                    timers.set(taskId, intervalId);
+                }
+            } else {
+                el.classList.remove('running');
+                if (timers.has(taskId)) {
+                    clearInterval(timers.get(taskId));
+                    timers.delete(taskId);
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Update timer error:', err);
+            // Optionally stop the timer locally on error
+            const el = document.getElementById(`timer-${taskId}`);
+            if (el) el.classList.remove('running');
+            if (timers.has(taskId)) {
+                clearInterval(timers.get(taskId));
+                timers.delete(taskId);
+            }
+        });
+}
+
+// Resume running timers on page load
+window.addEventListener('DOMContentLoaded', () => {
+    {% for task in tasks %}
+        {% if task.is_running %}
+            startTimer({{ task.id }});
+        {% endif %}
+    {% endfor %}
+});
+</script>
+</body>
+</html>
